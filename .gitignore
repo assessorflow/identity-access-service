@@ -1,0 +1,21 @@
+# Build
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Service account keys — never commit
+*-sa.json
+
+# Env files
+.env
+*.env.local

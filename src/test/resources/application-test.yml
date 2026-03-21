@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  cloud:
+    gcp:
+      project-id: accessorflow
+      secretmanager:
+        enabled: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    private-key-content: ${sm://jwt-private-key}
+    public-key-content: ${sm://jwt-public-key}
+    issuer: assessorflow
+    audience: assessorflow-api
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-ms: 604800000
+
+grpc:
+  server:
+    port: 0

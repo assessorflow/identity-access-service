@@ -1,0 +1,27 @@
+spring:
+  cloud:
+    gcp:
+      project-id: accessorflow
+      secretmanager:
+        enabled: true
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/identity_access_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+logging:
+  level:
+    sg.edu.nus.iss.identity: DEBUG
+    org.hibernate.SQL: DEBUG
