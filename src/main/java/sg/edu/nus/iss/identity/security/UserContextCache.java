@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+import sg.edu.nus.iss.identity.config.JwtProperties;
 import sg.edu.nus.iss.identity.entity.User;
 
 import java.util.HashMap;
@@ -13,7 +14,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Caches user context in Redis for distributed access by other services.
- * Key format: user:{user_id} -> { user_id, workflow_id, role, permissions }
+ * Key format: user:{user_id} -> { user_id, workflow_id, role }
+ * See redis_store.md Section 1.
  */
 @Slf4j
 @Component
@@ -21,21 +23,19 @@ import java.util.concurrent.TimeUnit;
 public class UserContextCache {
 
     private static final String KEY_PREFIX = "user:";
-    private static final long TTL_HOURS = 24;
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final JwtProperties jwtProperties;
 
     public void cacheUserContext(User user) {
         String key = KEY_PREFIX + user.getId();
         Map<String, Object> context = new HashMap<>();
         context.put("user_id", user.getId().toString());
-        context.put("workflow_id", null);
+        context.put("workflow_id", "");
         context.put("role", user.getRole());
-        context.put("email", user.getEmail());
-        context.put("full_name", user.getFullName());
 
         redisTemplate.opsForHash().putAll(key, context);
-        redisTemplate.expire(key, TTL_HOURS, TimeUnit.HOURS);
+        redisTemplate.expire(key, jwtProperties.getRefreshTokenExpirationMs(), TimeUnit.MILLISECONDS);
         log.debug("Cached user context for user_id={}", user.getId());
     }
 

@@ -9,7 +9,8 @@ import sg.edu.nus.iss.identity.dto.request.LoginRequest;
 import sg.edu.nus.iss.identity.dto.request.RefreshTokenRequest;
 import sg.edu.nus.iss.identity.dto.request.RegisterRequest;
 import sg.edu.nus.iss.identity.dto.response.AuthResponse;
-import sg.edu.nus.iss.identity.dto.response.UserResponse;
+import sg.edu.nus.iss.identity.dto.response.AuthUserResponse;
+import sg.edu.nus.iss.identity.dto.response.RefreshResponse;
 import sg.edu.nus.iss.identity.entity.Session;
 import sg.edu.nus.iss.identity.entity.User;
 import sg.edu.nus.iss.identity.exception.ServiceException;
@@ -17,8 +18,9 @@ import sg.edu.nus.iss.identity.repository.SessionRepository;
 import sg.edu.nus.iss.identity.repository.UserRepository;
 import sg.edu.nus.iss.identity.security.UserContextCache;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -69,11 +71,11 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse refreshToken(RefreshTokenRequest request) {
-        Session session = sessionRepository.findByToken(request.getRefreshToken())
+    public RefreshResponse refreshToken(RefreshTokenRequest request) {
+        Session session = sessionRepository.findByRefreshToken(request.getRefreshToken())
                 .orElseThrow(() -> ServiceException.unauthorized("Invalid refresh token"));
 
-        if (session.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (session.getExpiresAt().isBefore(Instant.now())) {
             sessionRepository.delete(session);
             throw ServiceException.unauthorized("Refresh token expired");
         }
@@ -83,52 +85,46 @@ public class AuthService {
             throw ServiceException.forbidden("Account is deactivated");
         }
 
-        // Rotate refresh token
-        sessionRepository.delete(session);
-        return buildAuthResponse(user);
+        String accessToken = jwtService.generateAccessToken(user);
+        return RefreshResponse.builder()
+                .accessToken(accessToken)
+                .expiresIn(jwtService.getAccessTokenExpirationMs() / 1000)
+                .build();
     }
 
     @Transactional
-    public void logout(String refreshToken) {
-        sessionRepository.findByToken(refreshToken).ifPresent(session -> {
-            userContextCache.evictUserContext(session.getUser().getId());
-            sessionRepository.delete(session);
-        });
+    public void logout(UUID userId) {
+        userContextCache.evictUserContext(userId);
+        sessionRepository.deleteAllByUserId(userId);
     }
 
     private AuthResponse buildAuthResponse(User user) {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
-        // Persist refresh token as a session
         Session session = Session.builder()
                 .user(user)
-                .token(refreshToken)
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .refreshToken(refreshToken)
+                .expiresAt(Instant.now().plusMillis(jwtService.getRefreshTokenExpirationMs()))
                 .build();
         sessionRepository.save(session);
 
-        // Cache user context in Redis for distributed access
         userContextCache.cacheUserContext(user);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpirationMs() / 1000)
-                .user(toUserResponse(user))
+                .user(toAuthUserResponse(user))
                 .build();
     }
 
-    private UserResponse toUserResponse(User user) {
-        return UserResponse.builder()
+    private AuthUserResponse toAuthUserResponse(User user) {
+        return AuthUserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole())
-                .isActive(user.getIsActive())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }

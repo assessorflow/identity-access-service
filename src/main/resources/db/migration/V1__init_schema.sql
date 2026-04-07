@@ -1,25 +1,25 @@
 -- Identity and Access Service schema
--- Matches schema.md Section 1 (MySQL)
+-- Matches schema.md Section 1 (PostgreSQL 18+)
 
 CREATE TABLE IF NOT EXISTS users (
-    id              BINARY(16)   PRIMARY KEY,
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255) NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
     full_name       VARCHAR(255) NOT NULL,
     role            VARCHAR(50)  NOT NULL,
-    is_active       TINYINT(1)   NOT NULL DEFAULT 1,
-    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    is_active       BOOLEAN      NOT NULL DEFAULT true,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS sessions (
-    id          BINARY(16)   PRIMARY KEY,
-    user_id     BINARY(16)   NOT NULL,
-    token       VARCHAR(512) NOT NULL UNIQUE,
-    expires_at  DATETIME     NOT NULL,
-    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID         NOT NULL,
+    refresh_token   TEXT         NOT NULL UNIQUE,
+    expires_at      TIMESTAMPTZ  NOT NULL,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);

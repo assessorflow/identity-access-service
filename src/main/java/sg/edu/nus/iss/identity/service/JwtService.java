@@ -77,6 +77,10 @@ public class JwtService {
         return jwtProperties.getAccessTokenExpirationMs();
     }
 
+    public long getRefreshTokenExpirationMs() {
+        return jwtProperties.getRefreshTokenExpirationMs();
+    }
+
     private String buildToken(User user, long expirationMs) {
         Date now = new Date();
         return Jwts.builder()

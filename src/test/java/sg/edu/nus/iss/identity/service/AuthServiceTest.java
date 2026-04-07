@@ -8,8 +8,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import sg.edu.nus.iss.identity.dto.request.LoginRequest;
+import sg.edu.nus.iss.identity.dto.request.RefreshTokenRequest;
 import sg.edu.nus.iss.identity.dto.request.RegisterRequest;
 import sg.edu.nus.iss.identity.dto.response.AuthResponse;
+import sg.edu.nus.iss.identity.dto.response.RefreshResponse;
 import sg.edu.nus.iss.identity.entity.Session;
 import sg.edu.nus.iss.identity.entity.User;
 import sg.edu.nus.iss.identity.exception.ServiceException;
@@ -17,14 +19,13 @@ import sg.edu.nus.iss.identity.repository.SessionRepository;
 import sg.edu.nus.iss.identity.repository.UserRepository;
 import sg.edu.nus.iss.identity.security.UserContextCache;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,8 +51,8 @@ class AuthServiceTest {
                 .fullName("Test User")
                 .role("assessor")
                 .isActive(true)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
     }
 
@@ -69,13 +70,16 @@ class AuthServiceTest {
         when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(any())).thenReturn("refresh-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(900000L);
+        when(jwtService.getRefreshTokenExpirationMs()).thenReturn(604800000L);
         when(sessionRepository.save(any(Session.class))).thenReturn(new Session());
 
         AuthResponse response = authService.register(request);
 
         assertThat(response.getAccessToken()).isEqualTo("access-token");
         assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
-        assertThat(response.getTokenType()).isEqualTo("Bearer");
+        assertThat(response.getExpiresIn()).isEqualTo(900);
+        assertThat(response.getUser().getEmail()).isEqualTo("test@example.com");
+        assertThat(response.getUser().getRole()).isEqualTo("assessor");
         verify(userContextCache).cacheUserContext(any());
     }
 
@@ -95,6 +99,19 @@ class AuthServiceTest {
     }
 
     @Test
+    void register_invalidRole_throwsBadRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("new@example.com");
+        request.setPassword("password123");
+        request.setFullName("User");
+        request.setRole("superadmin");
+
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("Invalid role");
+    }
+
+    @Test
     void login_success() {
         LoginRequest request = new LoginRequest();
         request.setEmail("test@example.com");
@@ -105,6 +122,7 @@ class AuthServiceTest {
         when(jwtService.generateAccessToken(any())).thenReturn("access-token");
         when(jwtService.generateRefreshToken(any())).thenReturn("refresh-token");
         when(jwtService.getAccessTokenExpirationMs()).thenReturn(900000L);
+        when(jwtService.getRefreshTokenExpirationMs()).thenReturn(604800000L);
         when(sessionRepository.save(any(Session.class))).thenReturn(new Session());
 
         AuthResponse response = authService.login(request);
@@ -140,5 +158,56 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("deactivated");
+    }
+
+    @Test
+    void refreshToken_success() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid-refresh-token");
+
+        Session session = Session.builder()
+                .user(testUser)
+                .refreshToken("valid-refresh-token")
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        when(sessionRepository.findByRefreshToken("valid-refresh-token")).thenReturn(Optional.of(session));
+        when(jwtService.generateAccessToken(testUser)).thenReturn("new-access-token");
+        when(jwtService.getAccessTokenExpirationMs()).thenReturn(900000L);
+
+        RefreshResponse response = authService.refreshToken(request);
+
+        assertThat(response.getAccessToken()).isEqualTo("new-access-token");
+        assertThat(response.getExpiresIn()).isEqualTo(900);
+        verify(sessionRepository, never()).delete(any());
+    }
+
+    @Test
+    void refreshToken_expired_throwsUnauthorized() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("expired-token");
+
+        Session session = Session.builder()
+                .user(testUser)
+                .refreshToken("expired-token")
+                .expiresAt(Instant.now().minusSeconds(3600))
+                .build();
+
+        when(sessionRepository.findByRefreshToken("expired-token")).thenReturn(Optional.of(session));
+
+        assertThatThrownBy(() -> authService.refreshToken(request))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("Refresh token expired");
+        verify(sessionRepository).delete(session);
+    }
+
+    @Test
+    void logout_deletesSessionsAndEvictsCache() {
+        UUID userId = testUser.getId();
+
+        authService.logout(userId);
+
+        verify(userContextCache).evictUserContext(userId);
+        verify(sessionRepository).deleteAllByUserId(userId);
     }
 }

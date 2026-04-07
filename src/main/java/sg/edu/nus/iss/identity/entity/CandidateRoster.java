@@ -8,27 +8,28 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "sessions")
+@Table(name = "candidate_roster", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"assessor_id", "email"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Session {
+public class CandidateRoster {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "assessor_id", nullable = false)
+    private UUID assessorId;
 
-    @Column(name = "refresh_token", nullable = false, unique = true, columnDefinition = "TEXT")
-    private String refreshToken;
+    @Column(nullable = false)
+    private String name;
 
-    @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt;
+    @Column(nullable = false)
+    private String email;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

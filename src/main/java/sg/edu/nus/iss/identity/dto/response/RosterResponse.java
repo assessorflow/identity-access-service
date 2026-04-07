@@ -5,14 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuthResponse {
+public class RosterResponse {
 
-    private String accessToken;
-    private String refreshToken;
-    private long expiresIn;
-    private AuthUserResponse user;
+    private UUID id;
+    private String name;
+    private String email;
+    private Instant createdAt;
 }
