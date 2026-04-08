@@ -68,12 +68,12 @@ jobs:
           file: .github/workflows/Dockerfile.ci
           push: true
           tags: |
-            ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/identity-access-service:${{ steps.tag.outputs.tag }}
-            ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/identity-access-service:latest
+            ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/${{ vars.ARTIFACT_REGISTRY_REPO }}:${{ steps.tag.outputs.tag }}
+            ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/${{ vars.ARTIFACT_REGISTRY_REPO }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Output image digest
         run: |
           echo "Image pushed successfully!"
-          echo "Image: ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/identity-access-service:${{ steps.tag.outputs.tag }}"
+          echo "Image: ${{ vars.ARTIFACT_REGISTRY_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REGISTRY_REPO }}/${{ vars.ARTIFACT_REGISTRY_REPO }}:${{ steps.tag.outputs.tag }}"
