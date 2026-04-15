@@ -8,6 +8,7 @@ import sg.edu.nus.iss.identity.dto.request.UpdateUserRequest;
 import sg.edu.nus.iss.identity.dto.response.UserResponse;
 import sg.edu.nus.iss.identity.entity.User;
 import sg.edu.nus.iss.identity.exception.ServiceException;
+import sg.edu.nus.iss.identity.repository.SessionRepository;
 import sg.edu.nus.iss.identity.repository.UserRepository;
 import sg.edu.nus.iss.identity.security.UserContextCache;
 
@@ -18,6 +19,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final SessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserContextCache userContextCache;
 
@@ -29,7 +31,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(User user) {
-        return toUserResponse(user);
+        // Principal may be a lightweight cache-only object (from JwtAuthenticationFilter Redis hit)
+        // — load the full user from DB to ensure all fields are populated
+        return toUserResponse(findUserOrThrow(user.getId()));
     }
 
     @Transactional
@@ -53,6 +57,7 @@ public class UserService {
         User user = findUserOrThrow(userId);
         user.setIsActive(false);
         userRepository.save(user);
+        sessionRepository.deleteAllByUserId(userId);
         userContextCache.evictUserContext(userId);
     }
 
@@ -61,6 +66,7 @@ public class UserService {
         User user = findUserOrThrow(userId);
         user.setIsActive(true);
         userRepository.save(user);
+        userContextCache.cacheUserContext(user);
     }
 
     @Transactional(readOnly = true)

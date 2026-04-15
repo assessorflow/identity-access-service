@@ -1,11 +1,14 @@
 server:
   port: 8081
+  shutdown: graceful
 
 spring:
   application:
     name: identity-access-service
-  profiles:
-    active: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  # No default profile — set explicitly per environment:
+  # Local: -Dspring.profiles.active=dev | Docker: SPRING_PROFILES_ACTIVE=docker | GKE: SPRING_PROFILES_ACTIVE=prod
   config:
     import: sm://
 
@@ -36,7 +39,7 @@ spring:
 
   cloud:
     gcp:
-      project-id: accessorflow
+      project-id: ${GCP_PROJECT_ID:aflow-491809}
       secretmanager:
         enabled: true
 
@@ -48,8 +51,8 @@ grpc:
 # JWT (RS256) — keys from GCP Secret Manager
 app:
   jwt:
-    private-key-content: ${sm://projects/accessorflow/secrets/jwt-private-key}
-    public-key-content: ${sm://projects/accessorflow/secrets/jwt-public-key}
+    private-key-content: ${sm://jwt-private-key}
+    public-key-content: ${sm://jwt-public-key}
     issuer: assessorflow
     audience: assessorflow-api
     access-token-expiration-ms: 900000      # 15 minutes

@@ -1,14 +1,14 @@
 spring:
   cloud:
     gcp:
-      project-id: accessorflow
+      project-id: aflow-491809
       secretmanager:
         enabled: true
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/identity_access_db
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: jdbc:postgresql://localhost:15433/af_identity
+    username: ${DB_USERNAME:assessorflow}
+    password: ${DB_PASSWORD:assessorflow_prod}
     driver-class-name: org.postgresql.Driver
 
   jpa:

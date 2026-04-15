@@ -6,8 +6,9 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Disables Spring Security integration for the gRPC server.
- * gRPC endpoints are internal (service-to-service within the cluster)
- * and do not need JWT/Spring Security — Kong handles external auth.
+ * gRPC endpoints are internal (service-to-service within the K8s cluster).
+ * Security relies on K8s network policies for pod-to-pod isolation — not Kong (Kong only proxies external HTTP).
+ * If mTLS is needed later (e.g., Istio), replace this with a certificate-based GrpcAuthenticationReader.
  */
 @Configuration
 public class GrpcSecurityConfig {

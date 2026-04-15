@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package sg.edu.nus.iss.identity.grpc.proto;
+
+option java_multiple_files = true;
+option java_package = "sg.edu.nus.iss.identity.grpc.proto";
+
+// Identity and Access Service — internal gRPC API (api_contract.md §1.5)
+// Called by any service needing auth validation (e.g., Assessment Submission Service, Knowledge Service)
+service IdentityService {
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string role = 3;
+}

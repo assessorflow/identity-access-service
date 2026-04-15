@@ -1,5 +1,6 @@
 package sg.edu.nus.iss.identity.service;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,6 +12,7 @@ import sg.edu.nus.iss.identity.dto.request.RegisterRequest;
 import sg.edu.nus.iss.identity.dto.response.AuthResponse;
 import sg.edu.nus.iss.identity.dto.response.AuthUserResponse;
 import sg.edu.nus.iss.identity.dto.response.RefreshResponse;
+import sg.edu.nus.iss.identity.entity.Roles;
 import sg.edu.nus.iss.identity.entity.Session;
 import sg.edu.nus.iss.identity.entity.User;
 import sg.edu.nus.iss.identity.exception.ServiceException;
@@ -19,7 +21,6 @@ import sg.edu.nus.iss.identity.repository.UserRepository;
 import sg.edu.nus.iss.identity.security.UserContextCache;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -27,19 +28,38 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final Set<String> VALID_ROLES = Set.of("assessor", "admin");
-
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserContextCache userContextCache;
+    private final MeterRegistry meterRegistry;
 
+    /**
+     * Public registration — only allows "assessor" role.
+     * Admin accounts must be created via registerAdmin() which requires ADMIN auth.
+     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (!VALID_ROLES.contains(request.getRole())) {
-            throw ServiceException.badRequest("Invalid role. Must be one of: " + VALID_ROLES);
+        if (!Roles.ASSESSOR.equals(request.getRole())) {
+            throw ServiceException.badRequest("Public registration only allows 'assessor' role");
         }
+        return createUser(request);
+    }
+
+    /**
+     * Admin-only registration — allows any valid role (assessor, admin).
+     * Called from the protected endpoint.
+     */
+    @Transactional
+    public AuthResponse registerAdmin(RegisterRequest request) {
+        if (!Roles.ALL.contains(request.getRole())) {
+            throw ServiceException.badRequest("Invalid role. Must be one of: " + Roles.ALL);
+        }
+        return createUser(request);
+    }
+
+    private AuthResponse createUser(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw ServiceException.conflict("Email already registered");
         }
@@ -52,21 +72,30 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
+        meterRegistry.counter("auth.register.success", "role", request.getRole()).increment();
+        log.info("User registered: userId={}, role={}", user.getId(), user.getRole());
         return buildAuthResponse(user);
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> ServiceException.unauthorized("Invalid email or password"));
+                .orElseThrow(() -> {
+                    meterRegistry.counter("auth.login.failure", "reason", "not_found").increment();
+                    return ServiceException.unauthorized("Invalid email or password");
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            meterRegistry.counter("auth.login.failure", "reason", "bad_password").increment();
             throw ServiceException.unauthorized("Invalid email or password");
         }
         if (!user.getIsActive()) {
+            meterRegistry.counter("auth.login.failure", "reason", "deactivated").increment();
             throw ServiceException.forbidden("Account is deactivated");
         }
 
+        meterRegistry.counter("auth.login.success").increment();
+        log.info("User logged in: userId={}", user.getId());
         return buildAuthResponse(user);
     }
 
@@ -85,6 +114,7 @@ public class AuthService {
             throw ServiceException.forbidden("Account is deactivated");
         }
 
+        meterRegistry.counter("auth.token.refresh.success").increment();
         String accessToken = jwtService.generateAccessToken(user);
         return RefreshResponse.builder()
                 .accessToken(accessToken)
@@ -96,6 +126,7 @@ public class AuthService {
     public void logout(UUID userId) {
         userContextCache.evictUserContext(userId);
         sessionRepository.deleteAllByUserId(userId);
+        log.info("User logged out: userId={}", userId);
     }
 
     private AuthResponse buildAuthResponse(User user) {

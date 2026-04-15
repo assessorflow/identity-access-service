@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: ""
   datasource:
     url: jdbc:h2:mem:testdb;MODE=PostgreSQL
     driver-class-name: org.h2.Driver
@@ -11,9 +13,8 @@ spring:
     enabled: false
   cloud:
     gcp:
-      project-id: accessorflow
       secretmanager:
-        enabled: true
+        enabled: false
   data:
     redis:
       host: localhost
@@ -21,8 +22,45 @@ spring:
 
 app:
   jwt:
-    private-key-content: ${sm://jwt-private-key}
-    public-key-content: ${sm://jwt-public-key}
+    private-key-content: |
+      -----BEGIN PRIVATE KEY-----
+      MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCyH36tw1Cm1fe4
+      TGJXugBbHV79SVDqKvZ4aVwj5cEupRQs8xvc8zzJ6aTxy2miay9VvGKbZb7LyDKW
+      vWJdFcm205NfCaDc90zCZqmsiuSDkDTDLOFJia5cnPQnjwba6Kw3QqrtM9jxq4rR
+      krARIDOGoQjGLbjO6LF/eWuN4GF5wPEFR7DvY4qzxllAGZoJYbwzcyn665eITt22
+      KKJ5/AtJd+9rOg/fYA88nFTjhkg6Hg9hNyTdyMopRVYha2SBVshm+rVqF1AmZLk4
+      mtffOdmU9+7WH9MU3cCtLSAtp4ynx+4a5LOL+NPqIp8T7AI5BTRyXd8l3j3aDKn5
+      bBT+mumnAgMBAAECggEAAnvOVpPqAV/rlux4IcScXqjd+zNVGn7ED9FZ3iV4K4Ah
+      WnyyGPZkFMvaNFJ9KmBkn5IDefeenaH9lDAXbNILjWFApWTLLM/4VQZjbt5DUDmB
+      hgf1+DWGpd0jL/rRjw0LFOL44sFqg/ju8/vsn1obyp1fAIxnDq0cVHlLI5/ktaYS
+      Gx4451V6r8f4cDQMp7JUKhgv8nkOxG0AhwmK8nPE0bG6Otl93D1RD+5YZgIKtmIo
+      F6ZEhAZRajpZAOHxZfuzGFstvTTdV4yZZ5phzrodRHaEsaViCtLVNu0+V/qlWvfa
+      neC30ZPW8j7EHjnZik7PdAc7tEcuY+HswxsIxRQewQKBgQDZjLHzKo3QvGORCuaK
+      2TsebuCaCrAnhgLHb7ViVLK5ae+EG2VDwcJFYjqM6UOJq8H7fuA8aqVM1mmTahz0
+      YDOzcdjn4voyOxuRnQ4kS+BXC1H5An1AAB9/skyedAHL+SnQrc6Eu9FVnkNtSrZR
+      /bDCWrV2mX6ScR2AcNXt/qyDRwKBgQDRmuUvdy6yKUraFrHWnPcWAFBSywbtJ/Uy
+      q9gqIJp8qYkAMHn/kf8jxHjimtSrDPe1BidZNjmN3hpWSjtAzhLPsGs7LqRGbLsh
+      1f4L9cKC4Va/CiFmtCB2nJ5fNFsG/tmCvz6b/QSNWDkTlpFc0LgT1utTrJEf7xfi
+      JKFkqCnWoQKBgC695QoLDZdYssfaILiaffJG/mj6fOixCW3SWZV7/z6JPVYUEMjj
+      G5uOxGe8Qq+UwMQJeaJhg4yj0OFEfl4fQVx/zIveH8WlH4JEzWIND3GEVCN9Xm3e
+      2OW16HJvGGe77DkS7vlj5VFRBMm5sLyjFlRb6vtFdYV/WkhbdguBmY1HAoGAF87U
+      QXP0JeBy1BrH0Gy71A/tD7pn6wAi5cKHJyHU6lwHZ7IZ6WGX7WQfpv2XMmairDkq
+      twNlviuAKlT8Lfw6PsT3KR2/IxCuoMVBufIMSfl2dPSdnqDPHynjA0VbIYxJAITg
+      g69VmQhwUz1C/ZvnjLlYuYRcZ5gsyk8G1fwT5IECgYEAjhr/pQlXGlQKEj3jr+L0
+      Ifaw4LFEb3IYw5cafmE2BN8NRV6SbVtSMD90IhFGBz4At0ptNDCSxElZWct+Hft8
+      FmzbD7bPWLua0FAMK3q9QG/Fhzo1Z5X0mB9LKh+LjyydnoY4iHeNWg6ilmptG7E1
+      WcWrxwWGAnukuhgKP3ORsJg=
+      -----END PRIVATE KEY-----
+    public-key-content: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsh9+rcNQptX3uExiV7oA
+      Wx1e/UlQ6ir2eGlcI+XBLqUULPMb3PM8yemk8ctpomsvVbxim2W+y8gylr1iXRXJ
+      ttOTXwmg3PdMwmaprIrkg5A0wyzhSYmuXJz0J48G2uisN0Kq7TPY8auK0ZKwESAz
+      hqEIxi24zuixf3lrjeBhecDxBUew72OKs8ZZQBmaCWG8M3Mp+uuXiE7dtiiiefwL
+      SXfvazoP32APPJxU44ZIOh4PYTck3cjKKUVWIWtkgVbIZvq1ahdQJmS5OJrX3znZ
+      lPfu1h/TFN3ArS0gLaeMp8fuGuSzi/jT6iKfE+wCOQU0cl3fJd492gyp+WwU/prp
+      pwIDAQAB
+      -----END PUBLIC KEY-----
     issuer: assessorflow
     audience: assessorflow-api
     access-token-expiration-ms: 900000
