@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.nimbusds.jwt.JWTClaimsSet;
 import sg.edu.nus.iss.identity.dto.request.LoginRequest;
 import sg.edu.nus.iss.identity.dto.request.RefreshTokenRequest;
 import sg.edu.nus.iss.identity.dto.request.RegisterRequest;
@@ -107,8 +107,16 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse authenticateViaGoogle(String credential) {
-        GoogleIdToken.Payload payload = googleTokenVerifier.verify(credential);
-        String email = payload.getEmail();
+        JWTClaimsSet claims = googleTokenVerifier.verify(credential);
+        String email;
+        try {
+            email = claims.getStringClaim("email");
+        } catch (java.text.ParseException e) {
+            throw ServiceException.unauthorized("Google credential missing email claim");
+        }
+        if (email == null || email.isBlank()) {
+            throw ServiceException.unauthorized("Google credential missing email claim");
+        }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {

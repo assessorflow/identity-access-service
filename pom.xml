@@ -74,11 +74,13 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
-        <!-- Google API Client — brings GoogleIdTokenVerifier for /api/v1/auth/google -->
+        <!-- Nimbus JOSE+JWT — verifies Google ID tokens against Google's JWKS
+             for POST /api/v1/auth/google. Chosen over google-api-client to
+             avoid transitive version conflicts with spring-cloud-gcp. -->
         <dependency>
-            <groupId>com.google.api-client</groupId>
-            <artifactId>google-api-client</artifactId>
-            <version>2.7.0</version>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.48</version>
         </dependency>
 
         <!-- JWT -->
