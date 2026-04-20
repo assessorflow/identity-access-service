@@ -57,6 +57,10 @@ app:
     audience: assessorflow-api
     access-token-expiration-ms: 900000      # 15 minutes
     refresh-token-expiration-ms: 604800000   # 7 days
+  # Google SSO — ID token exchange at POST /api/v1/auth/google
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    hosted-domain: ${GOOGLE_HOSTED_DOMAIN:}
 
 # Actuator
 management:

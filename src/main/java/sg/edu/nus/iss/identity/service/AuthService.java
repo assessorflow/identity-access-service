@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import sg.edu.nus.iss.identity.dto.request.LoginRequest;
 import sg.edu.nus.iss.identity.dto.request.RefreshTokenRequest;
 import sg.edu.nus.iss.identity.dto.request.RegisterRequest;
@@ -34,6 +35,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserContextCache userContextCache;
     private final MeterRegistry meterRegistry;
+    private final GoogleTokenVerifierService googleTokenVerifier;
 
     /**
      * Public registration — only allows "assessor" role.
@@ -96,6 +98,32 @@ public class AuthService {
 
         meterRegistry.counter("auth.login.success").increment();
         log.info("User logged in: userId={}", user.getId());
+        return buildAuthResponse(user);
+    }
+
+    /**
+     * Google SSO login. Verifies the Google ID token, looks up the email in af_identity.users
+     * (whitelist only — no auto-provisioning), and issues the same AuthResponse as /login.
+     */
+    @Transactional
+    public AuthResponse authenticateViaGoogle(String credential) {
+        GoogleIdToken.Payload payload = googleTokenVerifier.verify(credential);
+        String email = payload.getEmail();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    meterRegistry.counter("auth.google.failure", "reason", "not_whitelisted").increment();
+                    log.warn("Google SSO rejected — email not whitelisted: {}", email);
+                    return ServiceException.forbidden("Your account is not authorized for this application");
+                });
+
+        if (!user.getIsActive()) {
+            meterRegistry.counter("auth.google.failure", "reason", "deactivated").increment();
+            throw ServiceException.forbidden("Account is deactivated");
+        }
+
+        meterRegistry.counter("auth.google.success").increment();
+        log.info("User logged in via Google SSO: userId={}", user.getId());
         return buildAuthResponse(user);
     }
 

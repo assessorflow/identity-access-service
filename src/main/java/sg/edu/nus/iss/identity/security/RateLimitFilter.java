@@ -32,7 +32,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final Set<String> RATE_LIMITED_PATHS = Set.of(
             "/api/v1/auth/login",
             "/api/v1/auth/register",
-            "/api/v1/auth/refresh"
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/google"
     );
 
     private final Map<String, RateWindow> clients = new ConcurrentHashMap<>();

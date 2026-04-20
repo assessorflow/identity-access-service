@@ -74,6 +74,13 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- Google API Client — brings GoogleIdTokenVerifier for /api/v1/auth/google -->
+        <dependency>
+            <groupId>com.google.api-client</groupId>
+            <artifactId>google-api-client</artifactId>
+            <version>2.7.0</version>
+        </dependency>
+
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
