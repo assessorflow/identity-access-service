@@ -6,9 +6,10 @@ import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.util.DefaultResourceRetriever;
+import com.nimbusds.jose.util.ResourceRetriever;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,8 @@ import sg.edu.nus.iss.identity.exception.ServiceException;
 
 import java.net.URL;
 import java.text.ParseException;
-import java.util.Set;
+import java.util.Date;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -40,21 +42,17 @@ public class GoogleTokenVerifierService {
             return;
         }
 
-        // JWKSourceBuilder refreshes the JWKS in the background and is tolerant
-        // of transient network failures.
+        ResourceRetriever retriever = new DefaultResourceRetriever(5_000, 5_000, 50 * 1024);
         JWKSource<SecurityContext> keySource = JWKSourceBuilder
-                .create(new URL(GOOGLE_JWKS_URL), null)
+                .create(new URL(GOOGLE_JWKS_URL), retriever)
                 .build();
         JWSKeySelector<SecurityContext> keySelector =
                 new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, keySource);
 
         DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
         processor.setJWSKeySelector(keySelector);
-        processor.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(
-                Set.of(props.getClientId()), // audience
-                null,
-                Set.of("iss", "aud", "exp", "iat", "sub"),
-                Set.of()));
+        // Claim validation (iss/aud/exp/email_verified/hd) is done explicitly in
+        // verify() — more readable than DefaultJWTClaimsVerifier's constructors.
         this.jwtProcessor = processor;
 
         log.info("GoogleTokenVerifier initialized (clientId={}, hostedDomain={})",
@@ -79,22 +77,36 @@ public class GoogleTokenVerifierService {
             throw ServiceException.unauthorized("Invalid Google credential");
         }
 
+        Date exp = claims.getExpirationTime();
+        if (exp == null || exp.before(new Date())) {
+            throw ServiceException.unauthorized("Google credential expired");
+        }
+
         String issuer = claims.getIssuer();
         if (!"https://accounts.google.com".equals(issuer) && !"accounts.google.com".equals(issuer)) {
             throw ServiceException.unauthorized("Unexpected issuer: " + issuer);
         }
 
-        Boolean emailVerified = claims.getBooleanClaim("email_verified");
-        if (!Boolean.TRUE.equals(emailVerified)) {
-            throw ServiceException.unauthorized("Google email not verified");
+        List<String> audience = claims.getAudience();
+        if (audience == null || !audience.contains(props.getClientId())) {
+            throw ServiceException.unauthorized("Unexpected audience");
         }
 
-        String expected = props.getHostedDomain();
-        if (expected != null && !expected.isBlank()) {
-            String hd = claims.getStringClaim("hd");
-            if (hd == null || !expected.equals(hd)) {
-                throw ServiceException.forbidden("Not a member of authorized domain");
+        try {
+            Boolean emailVerified = claims.getBooleanClaim("email_verified");
+            if (!Boolean.TRUE.equals(emailVerified)) {
+                throw ServiceException.unauthorized("Google email not verified");
             }
+
+            String expected = props.getHostedDomain();
+            if (expected != null && !expected.isBlank()) {
+                String hd = claims.getStringClaim("hd");
+                if (hd == null || !expected.equals(hd)) {
+                    throw ServiceException.forbidden("Not a member of authorized domain");
+                }
+            }
+        } catch (ParseException e) {
+            throw ServiceException.unauthorized("Malformed claim in Google credential: " + e.getMessage());
         }
         return claims;
     }
