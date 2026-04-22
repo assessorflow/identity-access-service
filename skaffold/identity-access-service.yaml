@@ -1,0 +1,24 @@
+apiVersion: skaffold/v4beta7
+kind: Config
+metadata:
+  name: identity-access-service
+
+# Cloud Deploy renders this file per target and applies the rendered
+# manifests. Images are built out-of-band by the service's own
+# docker-build workflow and pushed to Artifact Registry;
+# `gcloud deploy releases create --images identity-access-service=<uri>` rewrites
+# the image placeholder in the manifest at release time.
+
+build:
+  artifacts: []
+
+manifests:
+  rawYaml:
+    - manifests/identity-access-service-deployment.yaml
+
+deploy:
+  kubectl: {}
+
+profiles:
+  - name: staging
+  - name: prod

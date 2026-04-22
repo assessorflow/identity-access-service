@@ -1,0 +1,24 @@
+# identity-access-service Deployment contract for Cloud Deploy.
+# The authoritative config lives in IaC_Smoke/k8s/ (Terraform). This
+# manifest is the kubectl-apply-able image-tag update hook; image
+# is rewritten at release time by gcloud deploy releases create.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-access-service
+  namespace: af-platform
+  labels:
+    app: identity-access-service
+    managed-by: clouddeploy
+spec:
+  selector:
+    matchLabels:
+      app: identity-access-service
+  template:
+    metadata:
+      labels:
+        app: identity-access-service
+    spec:
+      containers:
+        - name: identity-access-service
+          image: identity-access-service
