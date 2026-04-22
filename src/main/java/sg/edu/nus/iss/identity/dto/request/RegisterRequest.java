@@ -8,6 +8,7 @@ import lombok.Data;
 @Data
 public class RegisterRequest {
 
+    // Test: pilot of per-service Cloud Deploy approval gate (2026-04-22).
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
