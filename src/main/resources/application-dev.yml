@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: sm://
   cloud:
     gcp:
       project-id: aflow-491809
