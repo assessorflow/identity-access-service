@@ -159,11 +159,14 @@ jobs:
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8081/actuator/health; then
               echo "Service is ready"
-              break
+              exit 0
             fi
             echo "Waiting... ($i/30)"
             sleep 2
           done
+          echo "Service failed to start. Container logs:"
+          docker logs identity-service
+          exit 1
 
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.14.0
