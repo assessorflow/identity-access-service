@@ -24,7 +24,7 @@ jobs:
   # Stage 1: Build + Unit/Integration Tests
   # ================================================================
   test:
-    name: Build + Test (46 tests)
+    name: Build + Test (Unit + Integration)
     runs-on: ubuntu-latest
     services:
       redis:
@@ -137,8 +137,9 @@ jobs:
           restore-keys: nvd-db-
 
       - name: Run OWASP Dependency-Check
-        run: mvn dependency-check:check -B
+        run: mvn dependency-check:check -DnvdApiKey=${{ secrets.NVD_API_KEY }} -B
         continue-on-error: true
+        timeout-minutes: 10
 
       - name: Upload report
         if: always()
