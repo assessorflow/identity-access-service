@@ -6,7 +6,7 @@ spring:
         enabled: true
 
   datasource:
-    url: jdbc:postgresql://localhost:15433/af_identity
+    url: jdbc:postgresql://localhost:15432/af_identity
     username: ${DB_USERNAME:assessorflow}
     password: ${DB_PASSWORD:assessorflow_prod}
     driver-class-name: org.postgresql.Driver

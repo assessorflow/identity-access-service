@@ -1,0 +1,172 @@
+name: CD — Push to Artifact Registry + DAST
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GCP_PROJECT_ID: aflow-491809
+  GCP_REGION: asia-southeast1
+  SERVICE_NAME: identity-access-service
+  IMAGE: asia-southeast1-docker.pkg.dev/aflow-491809/identity-access-service/identity-access-service
+
+jobs:
+  # ================================================================
+  # Stage 1: Build + Push to Artifact Registry
+  # ================================================================
+  push:
+    name: Build + Push to Artifact Registry
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+
+      - name: Build JAR
+        run: mvn clean package -DskipTests -B
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Extract version tag
+        id: version
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +%Y%m%d)" >> $GITHUB_OUTPUT
+
+      - name: Build and push to Artifact Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.IMAGE }}:${{ steps.version.outputs.date }}-${{ steps.version.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Print image URL
+        run: |
+          echo "Pushed: ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}"
+          echo "Pushed: ${{ env.IMAGE }}:latest"
+
+  # ================================================================
+  # Stage 2: DAST — Run ZAP against the actual deployed container
+  # ================================================================
+  dast:
+    name: DAST — ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    needs: [push]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: assessorflow
+          POSTGRES_PASSWORD: assessorflow_prod
+          POSTGRES_DB: af_identity
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U assessorflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Pull and run the actual container from Artifact Registry
+        run: |
+          docker pull ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
+          docker run -d --name identity-service \
+            --network host \
+            -e SPRING_PROFILES_ACTIVE=docker \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:15432/af_identity \
+            -e SPRING_DATASOURCE_USERNAME=assessorflow \
+            -e SPRING_DATASOURCE_PASSWORD=assessorflow_prod \
+            -e SPRING_DATA_REDIS_HOST=localhost \
+            -e SPRING_CONFIG_IMPORT="" \
+            -e SPRING_CLOUD_GCP_SECRETMANAGER_ENABLED=false \
+            -e APP_JWT_PRIVATE_KEY_CONTENT="$(cat src/test/resources/application-test.yml | grep -A30 'private-key-content' | tail -n+2 | head -28 | sed 's/^      //')" \
+            -e APP_JWT_PUBLIC_KEY_CONTENT="$(cat src/test/resources/application-test.yml | grep -A15 'public-key-content' | tail -n+2 | head -10 | sed 's/^      //')" \
+            ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
+
+      - name: Wait for service to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8081/actuator/health; then
+              echo "Service is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "http://localhost:8081"
+          rules_file_name: ""
+          cmd_options: "-a -j"
+          allow_issue_writing: false
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report_html.html
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs identity-service
