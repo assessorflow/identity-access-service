@@ -125,6 +125,19 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
+      - name: Extract test JWT keys from test config
+        run: |
+          pip install pyyaml -q
+          python3 -c "
+          import yaml
+          with open('src/test/resources/application-test.yml') as f:
+              cfg = yaml.safe_load(f)
+          with open('/tmp/jwt-private.pem', 'w') as f:
+              f.write(cfg['app']['jwt']['private-key-content'])
+          with open('/tmp/jwt-public.pem', 'w') as f:
+              f.write(cfg['app']['jwt']['public-key-content'])
+          "
+
       - name: Pull and run the actual container from Artifact Registry
         run: |
           docker pull ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
@@ -137,8 +150,8 @@ jobs:
             -e SPRING_DATA_REDIS_HOST=localhost \
             -e SPRING_CONFIG_IMPORT="" \
             -e SPRING_CLOUD_GCP_SECRETMANAGER_ENABLED=false \
-            -e APP_JWT_PRIVATE_KEY_CONTENT="$(cat src/test/resources/application-test.yml | grep -A30 'private-key-content' | tail -n+2 | head -28 | sed 's/^      //')" \
-            -e APP_JWT_PUBLIC_KEY_CONTENT="$(cat src/test/resources/application-test.yml | grep -A15 'public-key-content' | tail -n+2 | head -10 | sed 's/^      //')" \
+            -e APP_JWT_PRIVATE_KEY_CONTENT="$(cat /tmp/jwt-private.pem)" \
+            -e APP_JWT_PUBLIC_KEY_CONTENT="$(cat /tmp/jwt-public.pem)" \
             ${{ env.IMAGE }}:${{ needs.push.outputs.image-tag }}
 
       - name: Wait for service to be ready
