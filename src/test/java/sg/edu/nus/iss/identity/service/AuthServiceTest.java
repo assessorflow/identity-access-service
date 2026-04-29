@@ -36,6 +36,8 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private UserContextCache userContextCache;
+    @Mock private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+    @Mock private io.micrometer.core.instrument.Counter counter;
 
     @InjectMocks
     private AuthService authService;
@@ -44,6 +46,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(meterRegistry.counter(any(String.class), any(String[].class))).thenReturn(counter);
         testUser = User.builder()
                 .id(UUID.randomUUID())
                 .email("test@example.com")
@@ -108,7 +111,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(request))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("Invalid role");
+                .hasMessageContaining("Public registration only allows");
     }
 
     @Test
